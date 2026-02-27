@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
+import 'app/app.dart';
 
 void main() {
-  runApp(const MaterialApp(home: Scaffold(body: Center(child: Text('HandiHub')))));
+  runApp(const HandiHubApp());
 }
