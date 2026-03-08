@@ -43,3 +43,40 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase — à remplacer par le vrai fichier (ne pas versionner les clés)
+# Décommenter quand le vrai google-services.json est en place :
+# android/app/google-services.json
+
+# VS Code (settings locaux non partagés)
+.vscode/
+
+# Flutter pub lock (optionnel selon les préférences d'équipe)
+# pubspec.lock
+
+# Fichiers système Windows
+Thumbs.db
+desktop.ini
+
+# Fichiers système macOS
+.DS_Store
+
+# Dossiers de build locaux
+/android/build/
+/android/.gradle/
+*.apk
+*.aab
+
+# Metadata Flutter générée localement
+.metadata
+.flutter-plugins
+
+# Logs
+*.log
+
+# Plateformes non ciblées (projet Android uniquement)
+/ios/
+/linux/
+/macos/
+/web/
+/windows/
