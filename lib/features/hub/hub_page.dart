@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 
+// page principale du hub de l'application
 class HubPage extends StatefulWidget {
   const HubPage({super.key});
 

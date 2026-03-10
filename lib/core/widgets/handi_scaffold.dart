@@ -10,12 +10,16 @@ class HandiScaffold extends StatelessWidget {
     required this.body,
     this.showHomeButton = true,
     this.actions,
+    this.leading,
   });
 
   final String title;
   final Widget body;
   final bool showHomeButton;
   final List<Widget>? actions;
+
+  /// Widget affiché à gauche de l'AppBar (ex. bouton retour).
+  final Widget? leading;
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +28,7 @@ class HandiScaffold extends StatelessWidget {
         toolbarHeight: 80,
         title: Text(title),
         automaticallyImplyLeading: false,
+        leading: leading,
         actions: [
           ...?actions,
           if (showHomeButton)
