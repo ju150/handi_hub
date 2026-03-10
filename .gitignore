@@ -44,9 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Firebase — à remplacer par le vrai fichier (ne pas versionner les clés)
-# Décommenter quand le vrai google-services.json est en place :
-# android/app/google-services.json
+# Firebase — clés secrètes, jamais versionnées
+android/app/google-services.json
+android/app/src/google-services.json
 
 # VS Code (settings locaux non partagés)
 .vscode/
