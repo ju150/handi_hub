@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:epub_view/epub_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../../core/services/epub_cache_service.dart';
 import '../../core/services/firebase_service.dart';
@@ -38,8 +39,28 @@ class _EpubViewerPageState extends State<EpubViewerPage> {
   /// Il passe à true seulement après que epub_view a eu le temps de sauter.
   bool _readyToSave = false;
 
+  /// Verrou anti-double-appui sur le bouton retour.
+  bool _navigating = false;
+
   /// Timer du défilement press-and-hold (null quand inactif).
   Timer? _scrollTimer;
+
+  // ── Constantes de défilement ──────────────────────────────────────────────
+  //
+  // Approche : chaque pas déplace le contenu d'une fraction fixe de la hauteur
+  // du viewport, indépendamment de la longueur des paragraphes.
+  //
+  // Pourquoi cela fixe le scroll "paragraphe-dépendant" :
+  //   Avant : scrollTo(index+1) → si le paragraphe est court : petit saut ;
+  //           si le paragraphe est long : grand saut (expérience chaotique).
+  //   Après : scrollTo(index, alignment: leadingEdge - step) → déplacement
+  //           toujours égal à [_kScrollStep] * hauteur_viewport. La longueur
+  //           du paragraphe n'influe plus sur la vitesse visuelle perçue.
+  //
+  // Ajuster [_kScrollStep] pour régler la vitesse (plus grand = plus rapide).
+  static const double _kScrollStep = 0.10; // 10 % du viewport par pas
+  static const int _kScrollIntervalMs = 450; // intervalle entre deux pas
+  static const int _kScrollAnimMs = 400; // durée d'animation par pas
 
   @override
   void initState() {
@@ -74,21 +95,37 @@ class _EpubViewerPageState extends State<EpubViewerPage> {
             StorageService.instance.getEpubPosition(widget.book.id);
 
         if (savedIndex != null && savedIndex > 0) {
-          // Attendre 600ms que epub_view finisse de construire sa liste
-          // avant d'appeler jumpTo() — sinon le saut est ignoré silencieusement.
-          Future.delayed(const Duration(milliseconds: 600), () {
-            if (mounted) {
+          // Attendre que epub_view ait fini de parser le document ET de monter
+          // la ScrollablePositionedList avant d'appeler jumpTo().
+          //
+          // Problème avec un délai fixe : si le parsing dépasse 600 ms,
+          // ItemScrollController._scrollableListState est encore null → exception.
+          //
+          // Solution : écouter isBookLoaded (mis à true par epub_view après
+          // _init() complet), puis attendre 300 ms supplémentaires pour que
+          // le premier build() de la liste soit terminé.
+          void restoreWhenReady() {
+            if (!(_controller?.isBookLoaded.value ?? false)) return;
+            _controller!.isBookLoaded.removeListener(restoreWhenReady);
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (!mounted) return;
               _controller!.jumpTo(index: savedIndex);
-              // Attendre encore 1s que le saut soit effectué avant d'autoriser
-              // les sauvegardes (sinon le listener voit index=0 et écrase tout).
-              Future.delayed(const Duration(milliseconds: 1000), () {
+              // 800 ms de grâce avant d'autoriser les sauvegardes, pour que
+              // le jump soit effectué et que le listener ne voie pas index=0.
+              Future.delayed(const Duration(milliseconds: 800), () {
                 if (mounted) _readyToSave = true;
               });
-            }
-          });
+            });
+          }
+
+          if (_controller!.isBookLoaded.value) {
+            restoreWhenReady();
+          } else {
+            _controller!.isBookLoaded.addListener(restoreWhenReady);
+          }
         } else {
-          // Pas de position sauvegardée : autoriser immédiatement (après rendu)
-          Future.delayed(const Duration(milliseconds: 600), () {
+          // Pas de position sauvegardée : autoriser après le premier rendu.
+          Future.delayed(const Duration(milliseconds: 400), () {
             if (mounted) _readyToSave = true;
           });
         }
@@ -117,6 +154,18 @@ class _EpubViewerPageState extends State<EpubViewerPage> {
     }
   }
 
+  // ── Navigation retour ─────────────────────────────────────────────────────
+
+  void _safeBack() {
+    if (_navigating) return;
+    _navigating = true;
+    // Délai anti-double-appui stylet (même valeur que le module Kiné).
+    Future.delayed(const Duration(milliseconds: 700), () {
+      _navigating = false;
+      if (mounted) context.pop();
+    });
+  }
+
   // ── Défilement press-and-hold ─────────────────────────────────────────────
   //
   // Comportement voulu : appuyer → scroll continu lent ; relever le stylet → arrêt.
@@ -125,26 +174,36 @@ class _EpubViewerPageState extends State<EpubViewerPage> {
   // GestureDetector.onLongPress a un délai de ~500ms avant de se déclencher.
   // Listener.onPointerDown se déclenche immédiatement au contact.
   //
-  // Rythme : 1 paragraphe immédiatement + 1 paragraphe toutes les 900ms.
-  // scrollTo avec duration 750ms crée une animation fluide entre deux paragraphes.
+  // Rythme : 1 pas immédiatement + 1 pas toutes les [_kScrollIntervalMs] ms.
+  // Chaque pas = [_kScrollStep] fraction de la hauteur du viewport.
 
   void _startScroll(int delta) {
     _scrollTimer?.cancel();
     _doScroll(delta); // déclenchement immédiat au premier contact
-    _scrollTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
-      _doScroll(delta);
-    });
+    _scrollTimer = Timer.periodic(
+      const Duration(milliseconds: _kScrollIntervalMs),
+      (_) => _doScroll(delta),
+    );
   }
 
   void _doScroll(int delta) {
     final pos = _controller?.currentValue?.position;
-    if (pos != null && mounted) {
-      final target = (pos.index + delta).clamp(0, 999999);
-      _controller!.scrollTo(
-        index: target,
-        duration: const Duration(milliseconds: 750),
-      );
-    }
+    if (pos == null || !mounted) return;
+
+    // Décalage d'alignement constant : déplace le contenu de [_kScrollStep]
+    // fraction de la hauteur du viewport à chaque pas.
+    // L'alignement représente la position du bord supérieur du paragraphe
+    // ancre dans le viewport (0 = haut, négatif = au-dessus du viewport).
+    // En soustrayant [step], on demande au paragraphe de remonter davantage,
+    // ce qui défile le contenu vers le bas (et inversement pour la montée).
+    final newAlignment = pos.itemLeadingEdge - delta * _kScrollStep;
+
+    _controller!.scrollTo(
+      index: pos.index,
+      alignment: newAlignment,
+      duration: const Duration(milliseconds: _kScrollAnimMs),
+      curve: Curves.easeOut,
+    );
   }
 
   void _stopScroll() {
@@ -309,32 +368,57 @@ class _EpubViewerPageState extends State<EpubViewerPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Écran de chargement plein-écran (style module Kiné) pendant le
+    // téléchargement/décompression du fichier EPUB.
+    if (_loading) return _buildLoader();
+
     return HandiScaffold(
       title: widget.book.title,
-      leading: IconButton(
-        iconSize: 48,
-        icon: const Icon(Icons.arrow_back_rounded),
-        tooltip: 'Bibliothèque',
-        onPressed: () => Navigator.of(context).pop(),
-      ),
+      onBack: _safeBack,
+      backTooltip: 'Bibliothèque',
       body: _buildBody(),
     );
   }
 
-  Widget _buildBody() {
-    if (_loading) {
-      return const Center(
+  // ── Loader kine-style ────────────────────────────────────────────────────
+
+  Widget _buildLoader() {
+    return Scaffold(
+      backgroundColor: HandiTheme.background,
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 24),
-            Text('Chargement du livre…', style: TextStyle(fontSize: 18)),
+            Icon(
+              Icons.menu_book_rounded,
+              size: 88,
+              color: HandiTheme.primary.withValues(alpha: 0.35),
+            ),
+            const SizedBox(height: 36),
+            const CircularProgressIndicator(
+              color: HandiTheme.primary,
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: 28),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'Chargement de « ${widget.book.title} »…',
+                style: const TextStyle(
+                  fontSize: 22,
+                  color: HandiTheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
+  Widget _buildBody() {
     if (_error != null) {
       return Center(
         child: Column(

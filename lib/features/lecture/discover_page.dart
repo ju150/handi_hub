@@ -27,14 +27,27 @@ class DiscoverPage extends StatefulWidget {
 }
 
 class _DiscoverPageState extends State<DiscoverPage> {
-  // Délai anti-chevauchement : bloque les taps 800ms après ouverture
+  // Loader d'entrée (style Kiné) + verrou anti-chevauchement sur les taps.
+  // Passer à false libère simultanément le loader et les interactions.
+  bool _loading = true;
   bool _interactable = false;
+  bool _navigating = false;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) setState(() => _interactable = true);
+    // 900 ms : durée standard d'entrée de module (même valeur que Kiné).
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() { _loading = false; _interactable = true; });
+    });
+  }
+
+  void _safeBack() {
+    if (_navigating) return;
+    _navigating = true;
+    Future.delayed(const Duration(milliseconds: 700), () {
+      _navigating = false;
+      if (mounted) context.pop();
     });
   }
 
@@ -184,16 +197,46 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
   }
 
+  Widget _buildLoader() {
+    return Scaffold(
+      backgroundColor: HandiTheme.background,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.explore_rounded,
+              size: 88,
+              color: HandiTheme.warning.withValues(alpha: 0.35),
+            ),
+            const SizedBox(height: 36),
+            const CircularProgressIndicator(
+              color: HandiTheme.warning,
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'Chargement des livres…',
+              style: TextStyle(
+                fontSize: 22,
+                color: HandiTheme.warning,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_loading) return _buildLoader();
+
     return HandiScaffold(
       title: 'Découvrir',
-      leading: IconButton(
-        iconSize: 48,
-        icon: const Icon(Icons.arrow_back_rounded),
-        tooltip: 'Bibliothèque',
-        onPressed: () => context.pop(),
-      ),
+      onBack: _safeBack,
+      backTooltip: 'Bibliothèque',
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

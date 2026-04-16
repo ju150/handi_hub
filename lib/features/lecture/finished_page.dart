@@ -16,25 +16,80 @@ Future<String?> _resolveCoverUrl(String? raw) async {
   }
 }
 
-class FinishedPage extends StatelessWidget {
+class FinishedPage extends StatefulWidget {
   const FinishedPage({super.key, required this.books});
   final List<BookEntry> books;
 
   @override
+  State<FinishedPage> createState() => _FinishedPageState();
+}
+
+class _FinishedPageState extends State<FinishedPage> {
+  bool _loading = true;
+  bool _navigating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
+
+  void _safeBack() {
+    if (_navigating) return;
+    _navigating = true;
+    Future.delayed(const Duration(milliseconds: 700), () {
+      _navigating = false;
+      if (mounted) context.pop();
+    });
+  }
+
+  Widget _buildLoader() {
+    return Scaffold(
+      backgroundColor: HandiTheme.background,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.check_circle_outline_rounded,
+              size: 88,
+              color: HandiTheme.success.withValues(alpha: 0.35),
+            ),
+            const SizedBox(height: 36),
+            const CircularProgressIndicator(
+              color: HandiTheme.success,
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'Chargement des livres terminés…',
+              style: TextStyle(
+                fontSize: 22,
+                color: HandiTheme.success,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_loading) return _buildLoader();
+
     return HandiScaffold(
       title: 'Livres terminés',
-      leading: IconButton(
-        iconSize: 48,
-        icon: const Icon(Icons.arrow_back_rounded),
-        tooltip: 'Bibliothèque',
-        onPressed: () => context.pop(),
-      ),
+      onBack: _safeBack,
+      backTooltip: 'Bibliothèque',
       body: ListView.builder(
-        itemCount: books.length,
+        itemCount: widget.books.length,
         itemBuilder: (_, i) => Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: _FinishedTile(book: books[i]),
+          child: _FinishedTile(book: widget.books[i]),
         ),
       ),
     );
@@ -55,7 +110,9 @@ class _FinishedTileState extends State<_FinishedTile> {
   void _handleTap() {
     final now = DateTime.now();
     if (_lastTap != null &&
-        now.difference(_lastTap!) < const Duration(milliseconds: 800)) return;
+        now.difference(_lastTap!) < const Duration(milliseconds: 800)) {
+      return;
+    }
     _lastTap = now;
     StorageService.instance.saveLastOpenedBook(widget.book.id);
     context.push('/lecture/epub/${widget.book.id}', extra: widget.book);

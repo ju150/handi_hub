@@ -32,6 +32,7 @@ class LecturePage extends StatefulWidget {
 class _LecturePageState extends State<LecturePage> {
   List<BookEntry> _books = [];
   bool _loading = true;
+  bool _navigating = false;
 
   @override
   void initState() {
@@ -40,11 +41,24 @@ class _LecturePageState extends State<LecturePage> {
   }
 
   Future<void> _fetchBooks() async {
+    // Durée minimale d'affichage du loader (évite le flash de contenu
+    // si Firebase répond en moins de 900 ms) — même constante que Kiné.
+    final minDelay = Future<void>.delayed(const Duration(milliseconds: 900));
     final books = await FirebaseService.instance.fetchBooks();
+    await minDelay;
     if (!mounted) return;
     setState(() {
       _books = books;
       _loading = false;
+    });
+  }
+
+  void _safeBack() {
+    if (_navigating) return;
+    _navigating = true;
+    Future.delayed(const Duration(milliseconds: 700), () {
+      _navigating = false;
+      if (mounted) context.go('/');
     });
   }
 
@@ -105,26 +119,50 @@ class _LecturePageState extends State<LecturePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Loader plein-écran (style Kiné) pendant la récupération Firebase.
+    if (_loading) return _buildLoader();
+
     return HandiScaffold(
       title: 'Bibliothèque',
+      onBack: _safeBack,
+      backTooltip: 'Accueil',
       body: _buildBody(),
     );
   }
 
-  Widget _buildBody() {
-    if (_loading) {
-      return const Center(
+  Widget _buildLoader() {
+    return Scaffold(
+      backgroundColor: HandiTheme.background,
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 24),
-            Text('Chargement de la bibliothèque…',
-                style: TextStyle(fontSize: 18)),
+            Icon(
+              Icons.auto_stories_rounded,
+              size: 88,
+              color: HandiTheme.primary.withValues(alpha: 0.35),
+            ),
+            const SizedBox(height: 36),
+            const CircularProgressIndicator(
+              color: HandiTheme.primary,
+              strokeWidth: 3,
+            ),
+            const SizedBox(height: 28),
+            const Text(
+              'Chargement de la bibliothèque…',
+              style: TextStyle(
+                fontSize: 22,
+                color: HandiTheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
+
+  Widget _buildBody() {
 
     if (_books.isEmpty) {
       return Center(
