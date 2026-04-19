@@ -12,6 +12,7 @@ import '../features/games/jeux/memory/memory_home_page.dart';
 import '../features/games/jeux/memory/memory_play_page.dart';
 import '../features/games/jeux/color_match/color_match_home_page.dart';
 import '../features/games/jeux/color_match/color_match_play_page.dart';
+import '../features/games/jeux/candy_crush/candy_crush_home_page.dart';
 import '../features/games/jeux/candy_crush/candy_crush_page.dart';
 
 import '../features/lecture/lecture_page.dart';
@@ -20,6 +21,9 @@ import '../features/lecture/discover_page.dart';
 import '../features/lecture/finished_page.dart';
 import '../features/lecture/lecture_data.dart';
 import '../features/discussion/discussion_page.dart';
+import '../features/discussion/pages/discussions_list_page.dart';
+import '../features/discussion/pages/conversation_page.dart';
+import '../features/discussion/pages/new_message_page.dart';
 import '../features/reeducation/reeducation_page.dart';
 
 // ── Imports partagés — modules simples (Respiration, Relaxation, Orthophonie) ──
@@ -122,7 +126,13 @@ class AppRouter {
           // Candy Crush adapté
           GoRoute(
             path: 'candy-crush',
-            builder: (_, __) => const CandyCrushPage(),
+            builder: (_, __) => const CandyCrushHomePage(),
+            routes: [
+              GoRoute(
+                path: 'play',
+                builder: (_, __) => const CandyCrushPage(),
+              ),
+            ],
           ),
 
           // Scores & favoris transversaux
@@ -167,6 +177,25 @@ class AppRouter {
       GoRoute(
         path: '/discussion',
         builder: (_, __) => const DiscussionPage(),
+        routes: [
+          GoRoute(
+            path: 'conversations',
+            builder: (_, __) => const DiscussionsListPage(),
+          ),
+          GoRoute(
+            path: 'conversation/:threadId',
+            builder: (_, state) => ConversationPage(
+              threadId: state.pathParameters['threadId']!,
+              address: state.extra as String? ?? '',
+            ),
+          ),
+          GoRoute(
+            path: 'new',
+            builder: (_, state) => NewMessagePage(
+              initialAddress: state.extra as String?,
+            ),
+          ),
+        ],
       ),
 
       // ── Rééducation — hub des sous-modules ────────────────────────────────

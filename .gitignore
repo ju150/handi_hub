@@ -47,6 +47,7 @@ app.*.map.json
 # Firebase — clés secrètes, jamais versionnées
 android/app/google-services.json
 android/app/src/google-services.json
+tools/firebase-admin-key.json
 
 # VS Code (settings locaux non partagés)
 .vscode/
@@ -80,3 +81,15 @@ desktop.ini
 /macos/
 /web/
 /windows/
+
+
+/docs
+/node_modules
+/tools
+/CLAUDE.md
+
+# Application admin web
+/admin/node_modules
+/admin/dist
+/admin/.env
+/admin/.env.local
