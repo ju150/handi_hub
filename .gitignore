@@ -45,8 +45,9 @@ app.*.map.json
 /android/app/release
 
 # Firebase — clés secrètes, jamais versionnées
-android/app/google-services.json
+# android/app/google-services.json est un fichier placeholder (sans vraies clés) — commité pour permettre la compilation
 android/app/src/google-services.json
+tools/firebase-admin-key.json
 tools/firebase-admin-key.json
 
 # VS Code (settings locaux non partagés)
