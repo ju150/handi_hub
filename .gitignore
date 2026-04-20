@@ -93,3 +93,6 @@ desktop.ini
 /admin/dist
 /admin/.env
 /admin/.env.local
+
+# Flutter DevTools (auto-généré)
+devtools_options.yaml

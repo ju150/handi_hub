@@ -24,6 +24,8 @@ import '../features/discussion/discussion_page.dart';
 import '../features/discussion/pages/discussions_list_page.dart';
 import '../features/discussion/pages/conversation_page.dart';
 import '../features/discussion/pages/new_message_page.dart';
+import '../features/discussion/pages/favorites_config_page.dart';
+import '../features/discussion/pages/discussion_settings_page.dart';
 import '../features/reeducation/reeducation_page.dart';
 
 // ── Imports partagés — modules simples (Respiration, Relaxation, Orthophonie) ──
@@ -184,16 +186,27 @@ class AppRouter {
           ),
           GoRoute(
             path: 'conversation/:threadId',
-            builder: (_, state) => ConversationPage(
-              threadId: state.pathParameters['threadId']!,
-              address: state.extra as String? ?? '',
-            ),
+            builder: (_, state) {
+              final tid = state.pathParameters['threadId']!;
+              return ConversationPage(
+                threadId: tid == 'new' ? '' : tid,
+                address: state.extra as String? ?? '',
+              );
+            },
+          ),
+          GoRoute(
+            path: 'settings',
+            builder: (_, __) => const DiscussionSettingsPage(),
           ),
           GoRoute(
             path: 'new',
             builder: (_, state) => NewMessagePage(
               initialAddress: state.extra as String?,
             ),
+          ),
+          GoRoute(
+            path: 'favorites-config',
+            builder: (_, __) => const FavoritesConfigPage(),
           ),
         ],
       ),

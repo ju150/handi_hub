@@ -29,7 +29,7 @@ class FirebaseService {
           .where('published', isEqualTo: true)
           .orderBy('order')
           .get()
-          .timeout(const Duration(seconds: 5)); // limite l’attente à 5 secondes max
+          .timeout(const Duration(seconds: 15)); // 15s : réseau mobile parfois lent au premier lancement
       debugPrint('📚 fetchBooks: ${snapshot.docs.length} livre(s) trouvé(s)');
       return snapshot.docs.map((doc) {
         final d = doc.data();
