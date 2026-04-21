@@ -16,10 +16,10 @@ import '../features/games/jeux/candy_crush/candy_crush_home_page.dart';
 import '../features/games/jeux/candy_crush/candy_crush_page.dart';
 
 import '../features/lecture/lecture_page.dart';
-import '../features/lecture/epub_viewer_page.dart';
-import '../features/lecture/discover_page.dart';
-import '../features/lecture/finished_page.dart';
-import '../features/lecture/lecture_data.dart';
+import '../features/lecture/pages/epub_viewer_page.dart';
+import '../features/lecture/pages/discover_page.dart';
+import '../features/lecture/pages/finished_page.dart';
+import '../features/lecture/models/lecture_data.dart';
 import '../features/discussion/discussion_page.dart';
 import '../features/discussion/pages/discussions_list_page.dart';
 import '../features/discussion/pages/conversation_page.dart';

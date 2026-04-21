@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
-import '../../core/services/firebase_service.dart';
-import '../../core/services/storage_service.dart';
+import 'services/firebase_service.dart';
+import 'services/storage_service.dart';
 import '../../core/widgets/handi_scaffold.dart';
-import 'lecture_data.dart';
+import 'models/lecture_data.dart';
 
 /// Résout l'URL de couverture quelle que soit sa forme :
 /// - URL https directe (ex: image hébergée ailleurs) → utilisée telle quelle

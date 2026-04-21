@@ -4,14 +4,22 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import android.telephony.SmsMessage
 
-// Reçoit SMS_RECEIVED — se déclenche pour TOUTES les apps avec RECEIVE_SMS,
-// même si l'app n'est pas l'app SMS par défaut.
-// Permet de détecter les SMS entrants quelle que soit la configuration.
 class SmsReceivedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
-            SmsEventBridge.notifySmsReceived()
+        if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        val pdus = intent.extras?.get("pdus") as? Array<*> ?: return
+        val format = intent.getStringExtra("format")
+        pdus.forEach { pdu ->
+            val msg = SmsMessage.createFromPdu(pdu as ByteArray, format) ?: return@forEach
+            LocalSmsStore.insert(
+                context,
+                msg.originatingAddress ?: "",
+                msg.messageBody ?: "",
+                msg.timestampMillis,
+            )
         }
+        SmsEventBridge.notifySmsReceived()
     }
 }

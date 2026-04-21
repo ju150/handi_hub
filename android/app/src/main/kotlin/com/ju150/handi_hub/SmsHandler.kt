@@ -48,7 +48,8 @@ class SmsHandler(
                 if (!hasPermissions()) return result.error("NO_PERMISSION", "Permission SMS refusée", null)
                 val threadId = call.argument<String>("threadId")
                     ?: return result.error("INVALID_ARG", "threadId manquant", null)
-                getMessages(threadId, result)
+                val address = call.argument<String>("address") ?: ""
+                getMessages(threadId, address, result)
             }
             "sendSms" -> {
                 val address = call.argument<String>("address")
@@ -59,6 +60,7 @@ class SmsHandler(
                 sendSms(address, body, threadId, result)
             }
             "getContacts" -> getContacts(result)
+            "debugAllSms"  -> debugAllSms(result)
             "deleteThread" -> {
                 val threadId = call.argument<String>("threadId")
                     ?: return result.error("INVALID_ARG", "threadId manquant", null)
@@ -149,11 +151,29 @@ class SmsHandler(
     }
 
     // ── Messages d'un thread ──────────────────────────────────────────────────
-    // Tous les messages (type inbox=1 ET sent=2) triés par DATE ASC.
-    // Aucune déduplication : on veut TOUT l'historique.
-    private fun getMessages(threadId: String, result: MethodChannel.Result) {
+    // Requête LIKE sur les chiffres bruts du numéro — robuste à tout format carrier.
+    // "0612345678" → pattern "%612345678%" → matche +33612345678, 33612345678, etc.
+    private fun getMessages(threadId: String, address: String, result: MethodChannel.Result) {
         try {
             val messages = mutableListOf<Map<String, Any?>>()
+            val coreDigits = address.replace(Regex("[^0-9]"), "")
+                .trimStart('0').takeIf { it.length >= 7 }
+
+            val selection: String
+            val selectionArgs: Array<String>
+
+            when {
+                coreDigits != null -> {
+                    selection = "${Telephony.Sms.ADDRESS} LIKE ?"
+                    selectionArgs = arrayOf("%$coreDigits%")
+                }
+                threadId.isNotEmpty() -> {
+                    selection = "${Telephony.Sms.THREAD_ID} = ?"
+                    selectionArgs = arrayOf(threadId)
+                }
+                else -> return result.success(messages)
+            }
+
             val cursor = context.contentResolver.query(
                 Telephony.Sms.CONTENT_URI,
                 arrayOf(
@@ -164,28 +184,77 @@ class SmsHandler(
                     Telephony.Sms.DATE,
                     Telephony.Sms.TYPE,
                 ),
-                // Filtre strict : uniquement ce thread, pas de draft ni de failed
-                "${Telephony.Sms.THREAD_ID} = ? AND ${Telephony.Sms.TYPE} IN (1, 2)",
-                arrayOf(threadId),
+                selection,
+                selectionArgs,
                 "${Telephony.Sms.DATE} ASC",
             ) ?: return result.success(messages)
 
             cursor.use {
                 while (it.moveToNext()) {
+                    val type = it.getInt(it.getColumnIndexOrThrow(Telephony.Sms.TYPE))
+                    if (type == 3) continue
                     messages.add(mapOf(
                         "id"       to it.getString(it.getColumnIndexOrThrow(Telephony.Sms._ID)),
                         "threadId" to it.getString(it.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)),
                         "address"  to (it.getString(it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)) ?: ""),
                         "body"     to (it.getString(it.getColumnIndexOrThrow(Telephony.Sms.BODY)) ?: ""),
                         "date"     to it.getLong(it.getColumnIndexOrThrow(Telephony.Sms.DATE)),
-                        "type"     to it.getInt(it.getColumnIndexOrThrow(Telephony.Sms.TYPE)),
+                        "type"     to type,
                     ))
                 }
             }
+
+            // Fusionner avec le stockage local (SMS reçus hors app par défaut).
+            // On déduplique par (body exact) pour éviter les doublons si le SMS est
+            // aussi dans content://sms.
+            val bodies = messages.map { it["body"] as String }.toHashSet()
+            val localCore = address.replace(Regex("[^0-9]"), "").trimStart('0')
+            LocalSmsStore.getForAddress(context, localCore).forEach { local ->
+                if (!bodies.contains(local["body"] as String)) {
+                    messages.add(local)
+                }
+            }
+            messages.sortWith(compareBy { it["date"] as Long })
+
             result.success(messages)
         } catch (e: Exception) {
             Log.e(TAG, "getMessages: ${e.message}")
             result.error("SMS_ERROR", e.message, null)
+        }
+    }
+
+    // Retourne les 30 derniers SMS bruts (aucun filtre) pour diagnostic.
+    private fun debugAllSms(result: MethodChannel.Result) {
+        try {
+            val items = mutableListOf<Map<String, Any?>>()
+            val cursor = context.contentResolver.query(
+                Telephony.Sms.CONTENT_URI,
+                arrayOf(
+                    Telephony.Sms.THREAD_ID,
+                    Telephony.Sms.ADDRESS,
+                    Telephony.Sms.BODY,
+                    Telephony.Sms.TYPE,
+                    Telephony.Sms.DATE,
+                ),
+                null, null,
+                "${Telephony.Sms.DATE} DESC",
+            ) ?: return result.success(items)
+
+            cursor.use {
+                var count = 0
+                while (it.moveToNext() && count < 30) {
+                    count++
+                    items.add(mapOf(
+                        "threadId" to (it.getString(it.getColumnIndexOrThrow(Telephony.Sms.THREAD_ID)) ?: ""),
+                        "address"  to (it.getString(it.getColumnIndexOrThrow(Telephony.Sms.ADDRESS)) ?: ""),
+                        "body"     to (it.getString(it.getColumnIndexOrThrow(Telephony.Sms.BODY)) ?: "").take(40),
+                        "type"     to it.getInt(it.getColumnIndexOrThrow(Telephony.Sms.TYPE)),
+                    ))
+                }
+            }
+            result.success(items)
+        } catch (e: Exception) {
+            result.error("DEBUG_ERROR", e.message, null)
         }
     }
 

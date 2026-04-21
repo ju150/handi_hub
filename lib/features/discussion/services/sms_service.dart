@@ -51,11 +51,11 @@ class SmsService {
     }
   }
 
-  static Future<List<SmsMessage>> getMessages(String threadId) async {
+  static Future<List<SmsMessage>> getMessages(String threadId, {String address = ''}) async {
     try {
       final raw = await _channel.invokeMethod<List<dynamic>>(
         'getMessages',
-        {'threadId': threadId},
+        {'threadId': threadId, 'address': address},
       );
       return raw
               ?.map((e) => SmsMessage.fromMap(Map<String, dynamic>.from(e as Map)))
@@ -76,6 +76,15 @@ class SmsService {
       return (result != null && result.isNotEmpty) ? result : null;
     } catch (_) {
       return null;
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> debugAllSms() async {
+    try {
+      final raw = await _channel.invokeMethod<List<dynamic>>('debugAllSms');
+      return raw?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? [];
+    } catch (e) {
+      return [{'error': e.toString()}];
     }
   }
 

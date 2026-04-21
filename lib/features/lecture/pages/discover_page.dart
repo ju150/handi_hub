@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../app/theme.dart';
-import '../../core/services/firebase_service.dart';
-import '../../core/services/storage_service.dart';
-import '../../core/widgets/handi_scaffold.dart';
-import 'lecture_data.dart';
+import '../../../app/theme.dart';
+import '../services/firebase_service.dart';
+import '../services/storage_service.dart';
+import '../../../core/widgets/handi_scaffold.dart';
+import '../models/lecture_data.dart';
 
 Future<String?> _resolveCoverUrl(String? raw) async {
   if (raw == null) return null;

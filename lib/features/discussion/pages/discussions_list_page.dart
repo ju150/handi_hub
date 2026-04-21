@@ -16,7 +16,7 @@ class DiscussionsListPage extends StatefulWidget {
   State<DiscussionsListPage> createState() => _DiscussionsListPageState();
 }
 
-class _DiscussionsListPageState extends State<DiscussionsListPage> {
+class _DiscussionsListPageState extends State<DiscussionsListPage> with WidgetsBindingObserver {
   List<SmsConversation> _conversations = [];
   Map<String, String> _nameMap = {};
   Map<String, Uint8List?> _photoMap = {};
@@ -28,6 +28,7 @@ class _DiscussionsListPageState extends State<DiscussionsListPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
     _smsSub = SmsService.smsEvents.listen((_) async {
       await Future.delayed(const Duration(milliseconds: 800));
@@ -36,7 +37,13 @@ class _DiscussionsListPageState extends State<DiscussionsListPage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !_navigating && mounted) _load();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _smsSub?.cancel();
     super.dispose();
   }

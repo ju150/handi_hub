@@ -25,7 +25,7 @@ class ConversationPage extends StatefulWidget {
   State<ConversationPage> createState() => _ConversationPageState();
 }
 
-class _ConversationPageState extends State<ConversationPage> {
+class _ConversationPageState extends State<ConversationPage> with WidgetsBindingObserver {
   List<SmsMessage> _messages = [];
   bool _loading = true;
   bool _sending = false;
@@ -41,6 +41,7 @@ class _ConversationPageState extends State<ConversationPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _threadId = widget.threadId;
     _loadContact();
     if (_threadId.isNotEmpty) {
@@ -55,7 +56,15 @@ class _ConversationPageState extends State<ConversationPage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _threadId.isNotEmpty && mounted) {
+      _load(scrollImmediate: false);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _smsSub?.cancel();
     _controller.dispose();
     _scrollController.dispose();
@@ -74,14 +83,14 @@ class _ConversationPageState extends State<ConversationPage> {
   Future<void> _load({bool scrollImmediate = false}) async {
     if (_threadId.isEmpty) return;
     if (!scrollImmediate) {
-      final msgs = await SmsService.getMessages(_threadId);
+      final msgs = await SmsService.getMessages(_threadId, address: widget.address);
       if (!mounted) return;
       setState(() => _messages = msgs);
       _scheduleScrollToBottom(immediate: false);
       return;
     }
     setState(() => _loading = true);
-    final msgs = await SmsService.getMessages(_threadId);
+    final msgs = await SmsService.getMessages(_threadId, address: widget.address);
     if (!mounted) return;
     setState(() {
       _messages = msgs;
@@ -208,7 +217,17 @@ class _ConversationPageState extends State<ConversationPage> {
       appBar: AppBar(
         toolbarHeight: 80,
         automaticallyImplyLeading: false,
+        centerTitle: true,
+        leading: _threadId.isNotEmpty
+            ? IconButton(
+                iconSize: 28,
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.white70),
+                tooltip: 'Supprimer la conversation',
+                onPressed: _confirmDelete,
+              )
+            : null,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             _contactPhoto != null
                 ? CircleAvatar(
@@ -228,7 +247,7 @@ class _ConversationPageState extends State<ConversationPage> {
                     ),
                   ),
             const SizedBox(width: 12),
-            Expanded(
+            Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -255,19 +274,6 @@ class _ConversationPageState extends State<ConversationPage> {
           ],
         ),
         actions: [
-          IconButton(
-            iconSize: 40,
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Actualiser',
-            onPressed: () => _load(scrollImmediate: false),
-          ),
-          if (_threadId.isNotEmpty)
-            IconButton(
-              iconSize: 40,
-              icon: const Icon(Icons.delete_outline_rounded),
-              tooltip: 'Supprimer la conversation',
-              onPressed: _confirmDelete,
-            ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: IconButton(

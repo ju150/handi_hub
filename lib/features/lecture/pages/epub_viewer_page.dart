@@ -4,12 +4,12 @@ import 'package:epub_view/epub_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../../app/theme.dart';
-import '../../core/services/epub_cache_service.dart';
-import '../../core/services/firebase_service.dart';
-import '../../core/services/storage_service.dart';
-import '../../core/widgets/handi_scaffold.dart';
-import 'lecture_data.dart';
+import '../../../app/theme.dart';
+import '../services/epub_cache_service.dart';
+import '../services/firebase_service.dart';
+import '../services/storage_service.dart';
+import '../../../core/widgets/handi_scaffold.dart';
+import '../models/lecture_data.dart';
 
 class EpubViewerPage extends StatefulWidget {
   const EpubViewerPage({super.key, required this.book});
